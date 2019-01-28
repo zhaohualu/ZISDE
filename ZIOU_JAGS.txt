@@ -1,0 +1,127 @@
+model{
+  for (i in 1:N) {
+    # Specify the probabilities in the Latent Regime Transition Model
+    # The first process
+    MTPMix[1, i, 1, 1] <- 0.5
+    MTPMix[1, i, 1, 2] <- 0.5
+    for (j in 2:EulerSubLenLastObs[i]) {
+      MTPMix[1, i, j, 1] <- exp(Ebeta[(midx[1, i, j - 1] -
+        1) * 2 + midx[2, i, j - 1], 1, MixLogiCovar[i,2] + 1])
+      MTPMix[1, i, j, 2] <- exp(Ebeta[(midx[1, i, j - 1] -
+        1) * 2 + midx[2, i, j - 1], 2, MixLogiCovar[i,2] + 1])
+    }
+    
+    # The second process
+    MTPMix[2, i, 1, 1] <- 0.5
+    MTPMix[2, i, 1, 2] <- 0.5
+    for (j in 2:EulerSubLenLastObs[i]) {
+      MTPMix[2, i, j, 1] <- exp(Pbeta[(midx[1, i, j - 1] -
+        1) * 2 + midx[2, i, j - 1], 1, MixLogiCovar[i,2] + 1])
+      MTPMix[2, i, j, 2] <- exp(Pbeta[(midx[1, i, j - 1] -
+        1) * 2 + midx[2, i, j - 1], 2, MixLogiCovar[i,2] + 1])
+    }
+    
+    # Specify the regime-switching OU model at time point 1
+    for (j in 1:NZ) {
+      Y[j, 1, i] ~ dnorm(0.00000E+00, 0.01)
+    }
+    midx[1, i, 1] ~ dcat(MTPMix[1, i, 1, 1:NMixComp])
+    midx[2, i, 1] ~ dcat(MTPMix[2, i, 1, 1:NMixComp])
+    for (j in 2:EulerSubLenLastObs[i]) {
+      
+      # Specify the  Latent Regime Transition Model
+      midx[1, i, j] ~ dcat(MTPMix[1, i, j, 1:NMixComp])
+      midx[2, i, j] ~ dcat(MTPMix[2, i, j, 1:NMixComp])
+      
+      # Specify the regime-switchin OU Model
+      
+      Y[1, j, i] ~ dnorm(ymu[1, j, i], tau[1, j, i])
+      ymu[1, j, i] <- Y[1, j - 1, i] + dt1[j - 1, i] *
+        dynpar[midx[1, i, j - 1], 1] * (dynpar[midx[1,
+            i, j - 1], 2] - Y[1, j - 1, i])
+      tau[1, j, i] <- 1/(dt1[j - 1, i] * dynpar[midx[1,
+            i, j - 1], 3])
+      Y[2, j, i] ~ dnorm(ymu[2, j, i], tau[2, j, i])
+      ymu[2, j, i] <- Y[2, j - 1, i] + dt1[j - 1, i] *
+        dynpar[midx[2, i, j - 1], 4] * (dynpar[midx[2,
+            i, j - 1], 5] - Y[2, j - 1, i])
+      tau[2, j, i] <- 1/(dt1[j - 1, i] * dynpar[midx[2,
+            i, j - 1], 6])
+    }
+    for (j in (EulerSubLenLastObs[i] + 1):EulerLenLastObsA1) {
+      midx[1, i, j] <- 1
+      midx[2, i, j] <- 1
+    }
+  }
+  
+  # Prior of parameters in OU model
+  for (k in 1:1) {
+    dynpar[k, 1] <- 60
+    dynpar[k, 2] <- 0.00000E+00
+    dynpar[k, 3] <- 1.00000E-04
+    dynpar[k, 4] <- 60
+    dynpar[k, 5] <- 0.00000E+00
+    dynpar[k, 6] <- 1.00000E-04
+  }
+  for (k in 2:2) {
+    dynpar[k, 1] ~ dnorm(0.2, 0.01)  T(0.00000E+00, )
+    dynpar[k, 2] ~ dnorm(2, 0.01)
+    dynpar[k, 3] ~ dgamma(2, 0.01)
+    dynpar[k, 4] ~ dnorm(0.2, 0.01)  T(0.00000E+00, )
+    dynpar[k, 5] ~ dnorm(2, 0.01)
+    dynpar[k, 6] ~ dgamma(2, 0.01)
+  }
+  
+  # Prior of parameters in the Latent Regime Transition Model
+  
+  # parameters for EP in matrix form
+  Ebeta[1, 1, 1] <- Ebetav[1]
+  Ebeta[1, 2, 1] <- 0.00000E+00
+  Ebeta[2, 1, 1] <- Ebetav[2]
+  Ebeta[2, 2, 1] <- 0.00000E+00
+  Ebeta[3, 1, 1] <- 0.00000E+00
+  Ebeta[3, 2, 1] <- Ebetav[3]
+  Ebeta[4, 1, 1] <- 0.00000E+00
+  Ebeta[4, 2, 1] <- Ebetav[4]
+  
+  # free parameters for EP
+  Ebetav[1] ~ dnorm(0.00000E+00, 1.00000E-04)
+  Ebetav[2] ~ dnorm(0.00000E+00, 1.00000E-04)
+  Ebetav[3] ~ dnorm(0.00000E+00, 1.00000E-04)
+  Ebetav[4] ~ dnorm(0.00000E+00, 1.00000E-04)
+  
+  # parameters for PR in matrix form
+  Pbeta[1, 1, 1] <- Pbetav[1]
+  Pbeta[1, 2, 1] <- 0.00000E+00
+  Pbeta[2, 1, 1] <- 0.00000E+00
+  Pbeta[2, 2, 1] <- Pbetav[2]
+  Pbeta[3, 1, 1] <- Pbetav[1]
+  Pbeta[3, 2, 1] <- 0.00000E+00
+  Pbeta[4, 1, 1] <- 0.00000E+00
+  Pbeta[4, 2, 1] <- Pbetav[2]
+  
+  # free parameters for PR
+  Pbetav[1] ~ dnorm(0.00000E+00, 1.00000E-04)
+  Pbetav[2] ~ dnorm(0.00000E+00, 1.00000E-04)
+  
+  # parameters at 48 months
+  Ebeta[1, 1, 2] <- Ebetav[1]
+  Ebeta[1, 2, 2] <- 0.00000E+00
+  Ebeta[2, 1, 2] <- Ebetav[2]
+  Ebeta[2, 2, 2] <- 0.00000E+00
+  Ebeta[3, 1, 2] <- 0.00000E+00
+  Ebeta[3, 2, 2] <- Ebetav[3] + Egammav[1]
+  Ebeta[4, 1, 2] <- 0.00000E+00
+  Ebeta[4, 2, 2] <- Ebetav[4]
+  Egammav[1] ~ dnorm(0.00000E+00, 1.00000E-04)
+  Pbeta[1, 1, 2] <- Pbetav[1] + Pgammav[1]
+  Pbeta[1, 2, 2] <- 0.00000E+00
+  Pbeta[2, 1, 2] <- 0.00000E+00
+  Pbeta[2, 2, 2] <- Pbetav[2]
+  Pbeta[3, 1, 2] <- Pbetav[1] + Pgammav[2]
+  Pbeta[3, 2, 2] <- 0.00000E+00
+  Pbeta[4, 1, 2] <- 0.00000E+00
+  Pbeta[4, 2, 2] <- Pbetav[2]
+  Pgammav[1] ~ dnorm(0.00000E+00, 1.00000E-04)
+  Pgammav[2] ~ dnorm(0.00000E+00, 1.00000E-04)
+}
